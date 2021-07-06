@@ -3,8 +3,15 @@ This is the source code for the Coding Challenge and Thematic Project of the Jun
 
 ## Coding Challenge
 
-The Coding Challenge is about writing code in the least number of lines. There are some restrictions to what you can and cannot do, but this will not review the rules. I will display the best code for each question. Please note that I used Python 3.9.5 to complete all of the questions.
+The Coding Challenge is about writing code in the least number of lines. There are some restrictions to what you can and cannot do, but this will not review the rules. I will display the best code for each question.
+
+### Languages Used
+* Python 3.9.5
 
 ## Thematic Project
 
-The Thematic Project is about creating a project of any programming language or framework given a theme. There are few restrictions to this event. This repository mainly contains the source code to the Thematic Project. Please note that I used Python 3.9.5 and Pygame 2.0.1 to create this project.
+The Thematic Project is about creating a project of any programming language or framework given a theme. There are few restrictions to this event. This repository contains the assets and code for the Thematic Project.
+
+### Languages Used
+* Python 3.9.5
+  * Pygame 2.0.1
