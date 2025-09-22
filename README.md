@@ -21,7 +21,7 @@ Cyber Tycoon is a management simulator built in Python with Pygame. Players take
 Clone the repository and install dependencies:
 
 ```bash
-git clone https://github.com/<your-username>/cyber-tycoon.git
+git clone https://github.com/aarindave/cyber-tycoon.git
 cd cyber-tycoon
 pip install -r requirements.txt
 ````
