@@ -1,17 +1,79 @@
-# June 2021 Hackathon
-This is the source code for the Coding Challenge and Thematic Project of the June 2021 Hackathon. Please note that the code will not improve over time, but there will be more of these types of repositories in the coming months.
+# Cyber Tycoon
 
-## Coding Challenge
+Cyber Tycoon is a management simulator built in Python with Pygame. Players take on the role of a cybersecurity startup founder balancing server operations, security upgrades, marketing campaigns, and webinars. The goal is to grow revenue, maintain security, and build popularity to achieve market dominance.
 
-The Coding Challenge is about writing code in the least number of lines. There are some restrictions to what you can and cannot do, but this will not review the rules. I will display the best code for each question.
+![Cyber Tycoon Screenshot](docs/screenshot.png)
 
-### Languages Used
-* Python 3.9.5
+---
 
-## Thematic Project
+## Features
 
-The Thematic Project is about creating a project of any programming language or framework given a theme. There are few restrictions to this event. This repository contains the assets and code for the Thematic Project.
+- **Interactive gameplay loop** with four upgrade paths: servers, security, marketing, and webinars.  
+- **Dynamic UI** with glowing cyberpunk-inspired design, smooth animations, and particle effects.  
+- **Popularity and profit system** that requires balancing short-term revenue with long-term growth.  
+- **Random events** such as hacking attempts, media boosts, and funding bonuses.  
+- **Win and loss conditions** that challenge the player to adapt strategy.  
 
-### Languages Used
-* Python 3.9.5
-  * Pygame 2.0.1
+---
+
+## Installation
+
+Clone the repository and install dependencies:
+
+```bash
+git clone https://github.com/<your-username>/cyber-tycoon.git
+cd cyber-tycoon
+pip install -r requirements.txt
+````
+
+---
+
+## Running the Game
+
+```bash
+python src/main.py
+```
+
+---
+
+## Controls
+
+* **Mouse**: Hover and click to interact with buttons and upgrades.
+* **Play**: Manage upgrades to increase profit and popularity.
+* **Win condition**: Reach 100 percent popularity.
+* **Loss condition**: Profit or popularity drops to zero.
+
+---
+
+## Requirements
+
+* Python 3.9 or later
+* Pygame
+
+Install requirements via:
+
+```bash
+pip install -r requirements.txt
+```
+
+---
+
+## Assets
+
+* Game icons located in `assets/images/`.
+* Sound effects located in `assets/sounds/`.
+* Fonts automatically fall back to system fonts if unavailable.
+
+---
+
+## Future Improvements
+
+* Additional upgrade paths and event types.
+* Difficulty settings.
+* Expanded art and audio assets.
+
+---
+
+## License
+
+This project is released under the MIT License.
