@@ -1,126 +1,242 @@
 import pygame
+import random
+import os
 from pygame.locals import *
 
-class XbitSimulator:
+from ui.button import Button
+from vfx.particle import Particle
+
+class CyberTycoon:
     def __init__(self):
-        # Initialize Pygame modules
         pygame.init()
         pygame.font.init()
         pygame.mixer.init()
 
-        # Screen setup
         self.WIDTH, self.HEIGHT = 800, 800
-        self.WIDTH_SPACING = self.WIDTH // 100
-        self.HEIGHT_SPACING = self.HEIGHT // 100
         self.screen = pygame.display.set_mode((self.WIDTH, self.HEIGHT))
-        pygame.display.set_caption("Xbit Cryptocurrency Business Simulator")
+        pygame.display.set_caption("Cyber Tycoon")
+        self.clock = pygame.time.Clock()
 
-        # Mouse state
+        # fonts with fallback
+        try:
+            self.title_font = pygame.font.Font("/System/Library/Fonts/Avenir.ttc", 48)
+            self.text_font = pygame.font.Font("/System/Library/Fonts/Avenir.ttc", 20)
+            self.ui_font = pygame.font.Font("/System/Library/Fonts/Avenir.ttc", 22)
+        except Exception:
+            self.title_font = pygame.font.SysFont("Arial", 48, bold=True)
+            self.text_font = pygame.font.SysFont("Arial", 20)
+            self.ui_font = pygame.font.SysFont("Arial", 22)
+
+        # load assets
+        self.assets_dir = os.path.join(os.path.dirname(__file__), "..", "assets")
+        self.images_dir = os.path.join(self.assets_dir, "images")
+        self.sounds_dir = os.path.join(self.assets_dir, "sounds")
+        self.server = self.safe_load_image("server.png", (48,48))
+        self.security = self.safe_load_image("security.png", (48,48))
+        self.ad = self.safe_load_image("ad.png", (48,48))
+        self.webinar = self.safe_load_image("webinar.png", (48,48))
+        self.click_sound = self.safe_load_sound("click.mp3")
+
+        # game state
+        self.levels = [1,1,1,1]
+        self.popularity = 2.5
+        self.displayed_popularity = 2.5
+        self.profit = 0.0
+        self.displayed_profit = 0.0
+        self.profit_rate = 0.005
+        self.inactive = False
+        self.page = "menu"
+
+        # UI and particles
+        self.particles = []
         self.mouse_x = 0
         self.mouse_y = 0
         self.mouse_down = False
 
-        # Game state
-        self.levels = [1, 1, 1, 1]
-        self.popularity = 2.5
-        self.profit = 0
-        self.profit_rate = 0.005
-        self.page = "menu"
-        self.inactive = False
+        # background streams for cyber aesthetic
+        self.streams = [random.randint(0, self.HEIGHT) for _ in range(120)]
 
-        # Assets
-        self.server = pygame.transform.scale(pygame.image.load("assets/images/server.png"), (50, 50))
-        self.security = pygame.transform.scale(pygame.image.load("assets/images/security.png"), (50, 50))
-        self.ad = pygame.transform.scale(pygame.image.load("assets/images/ad.png"), (50, 50))
-        self.webinar = pygame.transform.scale(pygame.image.load("assets/images/webinar.png"), (50, 50))
-        self.click_sound = pygame.mixer.Sound("assets/sounds/click.mp3")
+        # buttons placeholder
+        self.main_buttons = []
 
-        # Clock
-        self.clock = pygame.time.Clock()
+        # timers
+        self.event_timer = 0
 
-    # ----------------------------
-    # Utility Methods
-    # ----------------------------
-    def reset(self):
-        self.mouse_x = self.mouse_y = 0
-        self.mouse_down = False
-        self.levels = [1, 1, 1, 1]
-        self.popularity = 2.5
-        self.profit = 0
-        self.profit_rate = 0.005
-        self.page = "menu"
-        self.inactive = False
+    def safe_load_image(self, filename, size=None):
+        path = os.path.join(self.images_dir, filename)
+        try:
+            img = pygame.image.load(path).convert_alpha()
+            if size:
+                img = pygame.transform.smoothscale(img, size)
+            return img
+        except Exception:
+            # return simple placeholder surface if missing
+            surf = pygame.Surface(size or (48,48), pygame.SRCALPHA)
+            pygame.draw.rect(surf, (100,100,100), surf.get_rect(), border_radius=8)
+            return surf
 
-    def show_text(self, text, x, y, color, size, center=False, center_x=False, center_y=False):
-        font_object = pygame.font.Font("/System/Library/Fonts/Avenir.ttc", size)
-        text_object = font_object.render(text, False, color)
-        if center:
-            self.screen.blit(text_object, (x - text_object.get_width() // 2, y - text_object.get_height() // 2))
-        elif center_x:
-            self.screen.blit(text_object, (x - text_object.get_width() // 2, y))
-        elif center_y:
-            self.screen.blit(text_object, (x, y - text_object.get_height() // 2))
-        else:
-            self.screen.blit(text_object, (x, y))
+    def safe_load_sound(self, filename):
+        path = os.path.join(self.sounds_dir, filename)
+        try:
+            return pygame.mixer.Sound(path)
+        except Exception:
+            # return silent fallback
+            class Silent:
+                def play(self, *a, **k): pass
+            return Silent()
 
-    def center_rect(self, x, y, width, height, color, border_radius=-1, text=""):
-        rect = pygame.draw.rect(self.screen, color, (x - width // 2, y - height // 2, width, height), 0, border_radius)
-        if text:
-            self.show_text(text, x, y, "white", height // 2, center=True)
-        return rect
+    ## utility drawing
 
-    # Game Pages
-    def menu(self):
-        self.show_text("Xbit Cryptocurrency Simulation", self.WIDTH_SPACING*50, self.HEIGHT_SPACING*10, "white", 50, True)
-        play_btn = self.center_rect(self.WIDTH_SPACING*50, self.HEIGHT_SPACING*25, 200, 75, "green", 10, "Play")
-        instr_btn = self.center_rect(self.WIDTH_SPACING*50, self.HEIGHT_SPACING*40, 200, 75, "gold1", 10, "Instructions")
+    def lerp(self, a, b, t):
+        return a + (b - a) * t
 
+    def draw_neon_gradient(self):
+        # vertical gradient base
+        for i in range(self.HEIGHT):
+            r = int(6 + i * 0.02)
+            g = int(10 + i * 0.03)
+            b = int(20 + i * 0.08)
+            pygame.draw.line(self.screen, (r, g, b), (0, i), (self.WIDTH, i))
+        # subtle vignette
+        vignette = pygame.Surface((self.WIDTH, self.HEIGHT), pygame.SRCALPHA)
+        pygame.draw.ellipse(vignette, (0, 0, 0, 120), (-self.WIDTH*0.2, -self.HEIGHT*0.2, int(self.WIDTH*1.4), int(self.HEIGHT*1.4)))
+        self.screen.blit(vignette, (0,0))
+
+    def draw_streams(self):
+        for i, y in enumerate(self.streams):
+            x = int(i * (self.WIDTH / len(self.streams)))
+            color = (0, 120 + (i % 6)*20, 180 + (i % 4)*12)
+            pygame.draw.line(self.screen, color, (x, y), (x, y+18), 2)
+            # drift
+            if random.random() < 0.4:
+                self.streams[i] += random.randint(2,6)
+            if self.streams[i] > self.HEIGHT + 20:
+                self.streams[i] = -random.randint(0, 40)
+
+    def draw_header(self):
+        # Main title
+        title = self.title_font.render("Cyber Tycoon", True, (0, 255, 200))
+        self.screen.blit(title, title.get_rect(center=(self.WIDTH//2, 60)))
+        # Subtitle directly under title
+        subtitle = self.text_font.render("Manage nodes, security, marketing, and webinars", True, (180, 200, 220))
+        self.screen.blit(subtitle, subtitle.get_rect(center=(self.WIDTH//2, 110)))
+
+
+    ## page builders
+
+    def build_main_buttons(self):
+        # button definitions: label_template, cost_calc, rate_inc, level_idx, icon_surface
+        specs = [
+            ("Upgrade Nodes", lambda: int(self.levels[0]), 0.02, 0, self.server),
+            ("Upgrade Security", lambda: int(self.levels[1]*5), 0.05, 1, self.security),
+            ("Launch Marketing", lambda: int(self.levels[2]*10), 0.1, 2, self.ad),
+            ("Host Webinar", lambda: int(self.levels[3]*20), 0.2, 3, self.webinar)
+        ]
+        self.main_buttons = []
+        base_y = 250
+        for i, (label, cost_fn, rate_inc, idx, icon) in enumerate(specs):
+            cost = cost_fn()
+            btn = Button(self.WIDTH//2, base_y + i*78, 420, 64, (28,28,36), f"{label}  •  ${cost}", font=self.ui_font, icon=icon)
+            self.main_buttons.append((btn, rate_inc, idx, cost))
+
+    def page_menu(self):
+        self.draw_neon_gradient()
+        self.draw_streams()
+        self.draw_header()
+        # Center menu buttons
+        play = Button(self.WIDTH//2, 240, 300, 84, (0,150,130), "Play", font=self.ui_font)
+        instr = Button(self.WIDTH//2, 340, 300, 84, (210,170,30), "Instructions", font=self.ui_font)
+        for b in [play, instr]:
+            b.update_hover((self.mouse_x, self.mouse_y))
+            b.draw(self.screen)
+        # Handle clicks
         if self.mouse_down:
-            if play_btn.collidepoint(self.mouse_x, self.mouse_y):
-                self.reset()
-                self.click_sound.play()
+            if play.clicked((self.mouse_x, self.mouse_y)):
+                self.reset_state()
+                if hasattr(self.click_sound, "play"): 
+                    self.click_sound.play()
                 return "main"
-            elif instr_btn.collidepoint(self.mouse_x, self.mouse_y):
-                self.click_sound.play()
+            if instr.clicked((self.mouse_x, self.mouse_y)):
+                if hasattr(self.click_sound, "play"): 
+                    self.click_sound.play()
                 return "instructions"
         return "menu"
 
-    def main(self):
-        # Show net worth and popularity bar
-        self.show_text(f"Net Worth: ${self.profit:.2f}", self.WIDTH_SPACING, self.HEIGHT_SPACING, "white", 40)
-        pygame.draw.rect(self.screen, "darkgreen", (0, self.HEIGHT_SPACING*10, self.WIDTH_SPACING*100, 50))
-        pygame.draw.rect(self.screen, "green", (0, self.HEIGHT_SPACING*10, self.WIDTH_SPACING* self.popularity, 50))
-        self.show_text(f"Popularity: {round(self.popularity,1)}%", self.WIDTH_SPACING*2, self.HEIGHT_SPACING*10.75, "white", 25)
-
-        # Buttons for upgrades
-        btns = [
-            ("Upgrade Servers", self.levels[0], 0.02, 1, self.server),
-            ("Upgrade Security", self.levels[1]*5, 0.05, 2, self.security),
-            ("Increase Ads", self.levels[2]*10, 0.1, 3, self.ad),
-            ("Host Webinar", self.levels[3]*20, 0.2, 4, self.webinar)
+    def page_instructions(self):
+        self.draw_neon_gradient()
+        self.draw_streams()
+        self.draw_header()
+        lines = [
+            "How to Play",
+            "Gain revenue by waiting. Use upgrades to increase revenue and popularity.",
+            "If profit <= $0 you lose. If popularity <= 0 you lose.",
+            "Reach 100% popularity to win.",
+            "Random events may help or harm your company.",
         ]
+        y = 140
+        self.draw_text_block(lines, 56, y)
+        # two buttons
+        play = Button(self.WIDTH//3, 700, 220, 64, (0,160,0), "Play", font=self.ui_font)
+        back = Button(self.WIDTH*2//3, 700, 220, 64, (160,20,20), "Back", font=self.ui_font)
+        for b in [play, back]:
+            b.update_hover((self.mouse_x, self.mouse_y))
+            b.draw(self.screen)
+        if self.mouse_down:
+            if play.clicked((self.mouse_x, self.mouse_y)):
+                self.reset_state()
+                if hasattr(self.click_sound, "play"): self.click_sound.play()
+                return "main"
+            if back.clicked((self.mouse_x, self.mouse_y)):
+                if hasattr(self.click_sound, "play"): self.click_sound.play()
+                return "menu"
+        return "instructions"
 
-        for i, (label, cost, rate_inc, level_idx, icon) in enumerate(btns):
-            y_pos = self.HEIGHT_SPACING*(20 + 7*i)
-            rect = pygame.draw.rect(self.screen, "gray30", (self.WIDTH_SPACING, y_pos, 350, 50), 0, 10)
-            self.show_text(f"{label}: ${cost}", self.WIDTH_SPACING*2, y_pos+25, "white", 25, center_y=True)
-            self.screen.blit(icon, rect.topright)
-            if self.mouse_down and rect.collidepoint(self.mouse_x, self.mouse_y):
+    def page_main(self):
+        self.draw_neon_gradient()
+        self.draw_streams()
+
+        # update displayed profit/popularity smoothly
+        self.displayed_profit = self.lerp(self.displayed_profit, self.profit, 0.08)
+        self.displayed_popularity = self.lerp(self.displayed_popularity, self.popularity, 0.06)
+
+        # popularity bar panel
+        panel_rect = pygame.Rect(24, 78, self.WIDTH - 48, 120)
+        pygame.draw.rect(self.screen, (18,18,24), panel_rect, border_radius=14)
+        # popularity bar
+        bar_bg = pygame.Rect(40, 118, self.WIDTH - 80, 36)
+        pygame.draw.rect(self.screen, (28,28,36), bar_bg, border_radius=10)
+        fill_w = int(max(0, min(1.0, self.displayed_popularity / 100.0)) * bar_bg.width)
+        fill_rect = pygame.Rect(bar_bg.x, bar_bg.y, fill_w, bar_bg.h)
+        pygame.draw.rect(self.screen, (0,220,170), fill_rect, border_radius=10)
+        pop_label = self.ui_font.render(f"Popularity: {self.displayed_popularity:.1f} %", True, (220, 240, 255))
+        self.screen.blit(pop_label, (40, 86))
+        # profit label in panel
+        profit_label = self.ui_font.render(f"Net Worth: ${self.displayed_profit:.2f}", True, (220,240,255))
+        self.screen.blit(profit_label, (self.WIDTH - profit_label.get_width() - 40, 86))
+
+        # build buttons and draw them
+        self.build_main_buttons()
+        for btn, rate_inc, idx, cost in self.main_buttons:
+            btn.update_hover((self.mouse_x, self.mouse_y))
+            btn.draw(self.screen)
+            if self.mouse_down and btn.clicked((self.mouse_x, self.mouse_y)):
+                # buy action
                 self.profit -= cost
                 self.profit_rate += rate_inc
                 self.inactive = False
-                self.levels[level_idx-1] += level_idx
-                self.click_sound.play()
+                self.levels[idx] += (idx + 1)
+                if hasattr(self.click_sound, "play"): self.click_sound.play()
+                # particle burst
+                for _ in range(14):
+                    color = (0, 220, 200, 180)
+                    self.particles.append(Particle(self.mouse_x, self.mouse_y, color))
 
-        # Profit accumulation and popularity adjustment
-        self.profit += self.profit_rate
-        if self.profit <= 0 or self.popularity <= 0:
-            return "end"
+        # profit accumulation and mechanics
+        self.profit += self.profit_rate  # passive gain
 
+        # inactivity/popularity logic
         if self.inactive:
             self.popularity -= 0.01
-            if self.popularity < 0:
-                return "end"
         elif self.popularity * 5 < sum(self.levels):
             self.popularity += 0.05 * (sum(self.levels) - self.popularity)
             if self.popularity >= 100:
@@ -128,78 +244,127 @@ class XbitSimulator:
         else:
             self.inactive = True
 
-        return "main"
+        # random events occasionally
+        self.event_timer += 1
+        if random.random() < 0.002:
+            event = random.choice(["hack", "bonus", "media"])
+            if event == "hack":
+                self.profit *= 0.86
+                for _ in range(18):
+                    self.particles.append(Particle(random.randint(100, 700), random.randint(180, 520), (255, 100, 100)))
+            elif event == "bonus":
+                self.profit += 8
+                for _ in range(10):
+                    self.particles.append(Particle(random.randint(100, 700), random.randint(180, 520), (120, 255, 200)))
+            else:
+                self.popularity += 3
+                for _ in range(8):
+                    self.particles.append(Particle(random.randint(100, 700), random.randint(180, 520), (100, 180, 255)))
 
-    def instructions(self):
-        self.show_text("How to Play", self.WIDTH_SPACING, self.HEIGHT_SPACING, "white", 48)
-        instructions = [
-            "Gain revenue by waiting!",
-            "Upgrade to increase your popularity, capacity, and revenue!",
-            "Don't reach bankruptcy ($0 or less)!",
-            "Don't reach 0% popularity!",
-            "Get 100% popularity to win!"
-        ]
-        for i, line in enumerate(instructions):
-            self.show_text(line, self.WIDTH_SPACING, self.HEIGHT_SPACING*(10 + 5*i), "white", 24)
+        # update particles
+        for p in self.particles[:]:
+            p.update()
+            p.draw(self.screen)
+            if p.life <= 0 or p.radius <= 0.4:
+                try:
+                    self.particles.remove(p)
+                except ValueError:
+                    pass
 
-        play_btn = self.center_rect(self.WIDTH_SPACING*15, self.HEIGHT_SPACING*40, 200, 75, "green", 10, "Play")
-        back_btn = self.center_rect(self.WIDTH_SPACING*45, self.HEIGHT_SPACING*40, 200, 75, "red", 10, "Back")
+        # lose condition
+        return "end" if self.profit <= 0 or self.popularity <= 0 else "main"
 
+
+    def page_end(self, win=False):
+        self.draw_neon_gradient()
+        self.draw_streams()
+        self.draw_header()
+        message = "Victory. Company Ascendant." if win else "Defeat. Company Collapsed."
+        color = (120, 255, 200) if win else (255, 120, 120)
+        msg_surf = self.title_font.render(message, True, color)
+        self.screen.blit(msg_surf, msg_surf.get_rect(center=(self.WIDTH//2, 180)))
+        # action buttons
+        again = Button(self.WIDTH//3, 620, 260, 72, (0,180,120), "Play Again", font=self.ui_font)
+        menu = Button(self.WIDTH*2//3, 620, 260, 72, (200,40,60), "Menu", font=self.ui_font)
+        for b in [again, menu]:
+            b.update_hover((self.mouse_x, self.mouse_y))
+            b.draw(self.screen)
+        # visual confetti for win
+        if win and random.random() < 0.25:
+            for _ in range(6):
+                self.particles.append(Particle(random.randint(80, 720), random.randint(200, 420), (random.randint(100,255), random.randint(160,255), 255)))
+        # particle updates
+        for p in self.particles[:]:
+            p.update()
+            p.draw(self.screen)
+            if p.life <= 0:
+                try:
+                    self.particles.remove(p)
+                except ValueError:
+                    pass
         if self.mouse_down:
-            if play_btn.collidepoint(self.mouse_x, self.mouse_y):
-                self.reset()
-                self.click_sound.play()
+            if again.clicked((self.mouse_x, self.mouse_y)):
+                self.reset_state()
+                if hasattr(self.click_sound, "play"): self.click_sound.play()
                 return "main"
-            elif back_btn.collidepoint(self.mouse_x, self.mouse_y):
-                self.click_sound.play()
-                return "menu"
-        return "instructions"
-
-    def end(self, win=False):
-        if win:
-            self.show_text("Congratulations! You Won!", self.WIDTH_SPACING*50, self.HEIGHT_SPACING*30, "green", 50, True)
-        else:
-            self.show_text("Game Over! Try Again!", self.WIDTH_SPACING*50, self.HEIGHT_SPACING*30, "red", 50, True)
-
-        play_btn = self.center_rect(self.WIDTH_SPACING*50, self.HEIGHT_SPACING*50, 200, 75, "green", 10, "Play")
-        back_btn = self.center_rect(self.WIDTH_SPACING*50, self.HEIGHT_SPACING*65, 200, 75, "red", 10, "Back")
-
-        if self.mouse_down:
-            if play_btn.collidepoint(self.mouse_x, self.mouse_y):
-                self.reset()
-                self.click_sound.play()
-                return "main"
-            elif back_btn.collidepoint(self.mouse_x, self.mouse_y):
-                self.click_sound.play()
+            if menu.clicked((self.mouse_x, self.mouse_y)):
+                if hasattr(self.click_sound, "play"): self.click_sound.play()
                 return "menu"
         return "end"
-    
-    # Main Loop
+
+    ## helper functions
+
+    def draw_text_block(self, lines, x, start_y, leading=36):
+        for i, line in enumerate(lines):
+            col = (180, 220, 240) if i > 0 else (220, 255, 255)
+            surf = self.text_font.render(line, True, col)
+            self.screen.blit(surf, (x, start_y + i*leading))
+
+    def reset_state(self):
+        self.levels = [1,1,1,1]
+        self.popularity = self.displayed_popularity = 2.5
+        self.profit = self.displayed_profit = 0.0
+        self.profit_rate = 0.005
+        self.inactive = False
+        self.particles.clear()
+        # reset streams to random positions for visual variety
+        self.streams = [random.randint(0, self.HEIGHT) for _ in range(len(self.streams))]
+
+    ## main loop
+
     def run(self):
         while True:
+            self.screen.fill((0,0,0))
+            # event handling
             for event in pygame.event.get():
                 if event.type == QUIT:
                     pygame.quit()
-                    exit()
+                    return
                 elif event.type == MOUSEBUTTONDOWN:
                     self.mouse_x, self.mouse_y = event.pos
                     self.mouse_down = True
+                elif event.type == MOUSEMOTION:
+                    self.mouse_x, self.mouse_y = event.pos
 
-            self.screen.fill("deepskyblue2")
-
+            # page routing
             if self.page == "menu":
-                self.page = self.menu()
-            elif self.page == "main":
-                self.page = self.main()
+                self.page = self.page_menu()
             elif self.page == "instructions":
-                self.page = self.instructions()
+                self.page = self.page_instructions()
+            elif self.page == "main":
+                self.page = self.page_main()
             elif self.page in ["end", "win"]:
-                self.page = self.end(self.page == "win")
+                win = (self.page == "win")
+                new_page = self.page_end(win)
+                self.page = new_page or self.page
 
+            # reset click state each frame
             self.mouse_down = False
-            pygame.display.update()
+
+            # draw streams on top for faint overlay
+            self.draw_streams()
+            pygame.display.flip()
             self.clock.tick(30)
 
-
 if __name__ == "__main__":
-    XbitSimulator().run()
+    CyberTycoon().run()
